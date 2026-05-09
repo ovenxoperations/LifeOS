@@ -1,3 +1,4 @@
+
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -136,8 +137,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t1);margi
   <div class="main">
 
     <div class="page active" id="page-expenses">
-      <div class="section-header"><div><div class="section-title">Expenses</div><div class="section-sub" id="exp-month-label"></div></div><button class="add-pill" onclick="openModal('exp')"><i class="ti ti-plus" aria-hidden="true"></i> Add</button></div>
+      <div class="section-header"><div><div class="section-title">Expenses</div><div class="section-sub" id="exp-month-label"></div></div><div style="display:flex;gap:8px">
+  <button class="add-pill" onclick="openModal('budget')" style="background:#E1F5EE;border-color:#1D9E75;color:#085041"><i class="ti ti-wallet" aria-hidden="true"></i> Salary</button>
+  <button class="add-pill" onclick="openModal('exp')"><i class="ti ti-plus" aria-hidden="true"></i> Add</button>
+</div></div>
       <div class="metrics-row" id="exp-metrics"></div>
+<div class="metrics-row" id="budget-metrics" style="padding-top:0"></div>
       <div class="card"><div class="card-head"><span class="card-title">Transactions</span></div><div id="exp-list"></div></div>
     </div>
 
@@ -207,6 +212,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t1);margi
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-budget" onclick="if(event.target===this)closeModals()">
+  <div class="modal"><div class="modal-handle"></div><h2>Set monthly salary</h2>
+    <div class="fg"><label>Monthly salary / budget (PKR)</label><input type="number" id="bf-amt" placeholder="e.g. 80000" min="0" autocomplete="off"></div>
+    <div class="fg"><label>Month</label><select id="bf-month">
+      <option value="0">January</option><option value="1">February</option><option value="2">March</option>
+      <option value="3">April</option><option value="4">May</option><option value="5">June</option>
+      <option value="6">July</option><option value="7">August</option><option value="8">September</option>
+      <option value="9">October</option><option value="10">November</option><option value="11">December</option>
+    </select></div>
+    <div class="modal-actions"><button class="btn-cancel" onclick="closeModals()">Cancel</button><button class="btn-save" onclick="saveBudget()">Save</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-hab" onclick="if(event.target===this)closeModals()">
   <div class="modal"><div class="modal-handle"></div><h2>Add habit</h2>
     <div class="fg"><label>Habit name</label><input type="text" id="hf-name" placeholder="e.g. Morning walk"></div>
@@ -244,22 +262,24 @@ document.getElementById('top-date').textContent=today.toLocaleDateString('en-US'
 function loadData(){
   try{
     return{
-      expenses: JSON.parse(localStorage.getItem('lifeos_expenses')) || [],
-      habits:   JSON.parse(localStorage.getItem('lifeos_habits'))   || [],
-      inventory:JSON.parse(localStorage.getItem('lifeos_inventory'))|| [],
-      reminders:JSON.parse(localStorage.getItem('lifeos_reminders'))|| [],
-      eId: parseInt(localStorage.getItem('lifeos_eId'))||1,
+  expenses: JSON.parse(localStorage.getItem('lifeos_expenses')) || [],
+  habits:   JSON.parse(localStorage.getItem('lifeos_habits'))   || [],
+  inventory:JSON.parse(localStorage.getItem('lifeos_inventory'))|| [],
+  reminders:JSON.parse(localStorage.getItem('lifeos_reminders'))|| [],
+  budgets:  JSON.parse(localStorage.getItem('lifeos_budgets'))  || {},
+  eId: parseInt(localStorage.getItem('lifeos_eId'))||1,
       hId: parseInt(localStorage.getItem('lifeos_hId'))||1,
       iId: parseInt(localStorage.getItem('lifeos_iId'))||1,
       rId: parseInt(localStorage.getItem('lifeos_rId'))||1,
     };
-  }catch(e){return{expenses:[],habits:[],inventory:[],reminders:[],eId:1,hId:1,iId:1,rId:1};}
+  }catch(e){return{expenses:[],habits:[],inventory:[],reminders:[],budgets:{},eId:1,hId:1,iId:1,rId:1};}
 }
 function save(){
   localStorage.setItem('lifeos_expenses', JSON.stringify(expenses));
   localStorage.setItem('lifeos_habits',   JSON.stringify(habits));
   localStorage.setItem('lifeos_inventory',JSON.stringify(inventory));
   localStorage.setItem('lifeos_reminders',JSON.stringify(reminders));
+  localStorage.setItem('lifeos_budgets',JSON.stringify(budgets));
   localStorage.setItem('lifeos_eId', eId);
   localStorage.setItem('lifeos_hId', hId);
   localStorage.setItem('lifeos_iId', iId);
@@ -268,6 +288,7 @@ function save(){
 const _d=loadData();
 let expenses=_d.expenses, habits=_d.habits, inventory=_d.inventory, reminders=_d.reminders;
 let eId=_d.eId, hId=_d.hId, iId=_d.iId, rId=_d.rId;
+let budgets=_d.budgets;
 
 const CAT={food:{bg:'#FAEEDA',fg:'#633806',icon:'ti-tool-kitchen-2'},transport:{bg:'#E6F1FB',fg:'#0C447C',icon:'ti-car'},shopping:{bg:'#FBEAF0',fg:'#72243E',icon:'ti-shopping-bag'},health:{bg:'#EAF3DE',fg:'#27500A',icon:'ti-heartbeat'},bills:{bg:'#EEEDFE',fg:'#3C3489',icon:'ti-file-invoice'},other:{bg:'#F1EFE8',fg:'#444441',icon:'ti-dots'}};
 const INV={groceries:{bg:'#EAF3DE',fg:'#27500A',icon:'ti-apple'},cleaning:{bg:'#E6F1FB',fg:'#0C447C',icon:'ti-wash'},medicine:{bg:'#FBEAF0',fg:'#72243E',icon:'ti-pill'},electronics:{bg:'#EEEDFE',fg:'#3C3489',icon:'ti-device-laptop'},other:{bg:'#F1EFE8',fg:'#444441',icon:'ti-package'}};
@@ -284,11 +305,34 @@ function showPage(p){
 }
 
 function renderExp(){
-  const tot=expenses.reduce((s,e)=>s+e.amount,0);
-  const cats=[...new Set(expenses.map(e=>e.cat))].length;
-  const big=expenses.reduce((a,b)=>a.amount>b.amount?a:b,{amount:0,desc:'-'});
+  const monthKey=today.getMonth();
+  const monthExp=expenses.filter(e=>new Date(e.date).getMonth()===monthKey);
+  const tot=monthExp.reduce((s,e)=>s+e.amount,0);
+  const allTot=expenses.reduce((s,e)=>s+e.amount,0);
+  const big=monthExp.reduce((a,b)=>a.amount>b.amount?a:b,{amount:0,desc:'-'});
   document.getElementById('exp-month-label').textContent=MONTHS[today.getMonth()]+' '+today.getFullYear();
-  document.getElementById('exp-metrics').innerHTML=mc('Total spent',fmt(tot),expenses.length+' transactions',true)+mc('Largest',fmt(big.amount),big.desc,false,false);
+  document.getElementById('exp-metrics').innerHTML=
+    mc('This month',fmt(tot),monthExp.length+' transactions',true)+
+    mc('Largest',fmt(big.amount),big.desc||'-',false,false);
+  const salary=budgets[monthKey]||0;
+  const remaining=salary-tot;
+  const pct=salary>0?Math.min(100,Math.round(tot/salary*100)):0;
+  const budgetHTML=salary>0?`
+    <div class="metric${remaining<0?' warn':''}">
+      <div class="metric-label">Remaining salary</div>
+      <div class="metric-val">${fmt(Math.abs(remaining))}</div>
+      <div class="metric-sub">${remaining<0?'⚠️ Over budget by '+fmt(-remaining):pct+'% of '+fmt(salary)+' used'}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Monthly salary</div>
+      <div class="metric-val">${fmt(salary)}</div>
+      <div class="metric-sub" style="margin-top:6px">
+        <div style="background:var(--border);border-radius:4px;height:5px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;border-radius:4px;background:${pct>90?'#D85A30':pct>70?'#BA7517':'#1D9E75'};transition:width .3s"></div>
+        </div>
+      </div>
+    </div>`:'<div class="metric" style="grid-column:1/-1;cursor:pointer" onclick="openModal(\'budget\')"><div class="metric-label">Monthly salary</div><div class="metric-val" style="font-size:14px;color:var(--t3)">Tap to set salary →</div><div class="metric-sub">Track what remains each month</div></div>';
+  document.getElementById('budget-metrics').innerHTML=budgetHTML;
   const el=document.getElementById('exp-list');
   if(!expenses.length){el.innerHTML='<div class="empty"><i class="ti ti-receipt-off" aria-hidden="true"></i>No transactions yet</div>';return;}
   el.innerHTML=[...expenses].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`
@@ -378,6 +422,12 @@ function toggleRem(id){const r=reminders.find(x=>x.id===id);if(r)r.done=!r.done;
 
 function openModal(t){
   const d=new Date().toISOString().split('T')[0];
+  if(t==='budget'){
+  document.getElementById('bf-amt').value=budgets[today.getMonth()]||'';
+  document.getElementById('bf-month').value=today.getMonth();
+  document.getElementById('modal-budget').classList.add('open');
+  return;
+}
   if(t==='exp'){document.getElementById('ef-desc').value='';document.getElementById('ef-amt').value='';document.getElementById('ef-date').value=d;document.getElementById('modal-exp').classList.add('open');}
   else if(t==='hab'){document.getElementById('hf-name').value='';document.getElementById('modal-hab').classList.add('open');}
   else if(t==='inv'){document.getElementById('if-name').value='';document.getElementById('if-stock').value=10;document.getElementById('if-thresh').value=3;document.getElementById('modal-inv').classList.add('open');}
@@ -421,4 +471,11 @@ function addBubble(text,type){
 function askQ(q){document.getElementById('chat-input').value=q;sendChat();}
 
 renderExp();renderHab();renderInv();renderRem();
+function saveBudget(){
+  const amt=parseFloat(document.getElementById('bf-amt').value);
+  const month=parseInt(document.getElementById('bf-month').value);
+  if(!amt)return;
+  budgets[month]=amt;
+  save();closeModals();renderExp();
+}
 </script>
